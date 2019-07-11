@@ -195,17 +195,35 @@ public class OpenCVHelper {
         // 7. Now you have the warped logo image in the right location, just overlay them on top of the camera image
         Mat output = new Mat();
         Mat grayMat = convertToGray(input);
-
-        //TODO: Do your magic!!!
-        // Hint how to overlay warped logo onto the original camera image
-        /*
+        startDoAR(droneHelper);
+        List<Mat> corners = new ArrayList<>();
+        Aruco.detectMarkers(grayMat, dictionary, corners, output);
+        if(corners.size() > 0) {
+            MatOfPoint2f rvec = new MatOfPoint2f();
+            MatOfPoint2f tvec = new MatOfPoint2f();
+            Calib3d.solvePnP(objPoints, (MatOfPoint2f)(corners.get(corners.size() - 1)), intrinsic,
+                    distortion, rvec, tvec);
+            MatOfPoint2f imagePoints = new MatOfPoint2f();
+            Calib3d.projectPoints(objectPoints, rvec, tvec, intrinsic, distortion, imagePoints);
+            Mat homo = Calib3d.findHomography((MatOfPoint2f)(corners.get(corners.size() - 1)), imagePoints);
+            Mat logoWarped = new Mat();
+            Imgproc.warpPerspective(logoImg, logoWarped, homo, logoWarped.size());
             Imgproc.cvtColor(logoWarped, grayMat, Imgproc.COLOR_BGR2GRAY);
             Imgproc.threshold(grayMat, grayMat, 0, 255, Imgproc.THRESH_BINARY);
+            Mat grayInv = new Mat();
+            Mat src1Final = new Mat();
+            Mat src2Final = new Mat();
             bitwise_not(grayMat, grayInv);
             input.copyTo(src1Final, grayInv);
             logoWarped.copyTo(src2Final, grayMat);
             Core.add(src1Final, src2Final, output);
-         */
+        }
+
+        //TODO: Do your magic!!!
+        // Hint how to overlay warped logo onto the original camera image
+
+
+
         //end magic
 
         if (output.empty()) {

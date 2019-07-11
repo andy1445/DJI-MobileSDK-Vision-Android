@@ -35,7 +35,7 @@
         android:supportsRtl="true">
         <meta-data
             android:name="com.dji.sdk.API_KEY"
-            android:value="YOUR KEY HERE"/>
+            android:value="1fce6b98dcfc99491a2cb2d0"/>
 
         <activity
             android:name=".ConnectionActivity"
