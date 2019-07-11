@@ -3,9 +3,13 @@ package com.dji.mobilesdk.vision;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.util.Log;
+
 import dji.common.flightcontroller.virtualstick.FlightControlData;
+
 import java.util.ArrayList;
 import java.util.List;
+
 import org.opencv.android.Utils;
 import org.opencv.aruco.Aruco;
 import org.opencv.aruco.Dictionary;
@@ -27,7 +31,10 @@ import org.opencv.objdetect.CascadeClassifier;
 
 import static org.opencv.core.Core.BORDER_DEFAULT;
 import static org.opencv.core.Core.bitwise_not;
+import static org.opencv.core.Core.eigen;
 import static org.opencv.core.Core.extractChannel;
+
+import java.util.Arrays;
 
 public class OpenCVHelper {
     private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
@@ -37,9 +44,12 @@ public class OpenCVHelper {
     private MatOfDouble distortion;
     private Mat logoImg;
     private MatOfPoint3f objectPoints;
+    private int id_to_visit;
+    private boolean has_visited_last_id;
 
     public OpenCVHelper(Context context) {
         this.context = context;
+        this.id_to_visit = 0;
     }
 
     public Mat defaultImageProcessing(Mat input) {
@@ -126,34 +136,63 @@ public class OpenCVHelper {
         //TODO
         // Implement your logic to decide where to move the drone
         // Below snippet is an example of how you can calculate the center of the marker
-        /*Scalar markerCenter = new Scalar(0, 0);
-        for (Mat corner : corners) {
+        Scalar markerCenter = new Scalar(0, 0);
+
+
+        int index = -1;
+        for (int i = 0; i < ids.depth(); i++) {
+            if (ids.get(i, 0) != null) {
+                //System.out.println("ids " + ids.size() + "element size" + ids.get(i,0).length + "element "+ids.get(i,0)[0]);
+                if (ids.get(i, 0)[0] == id_to_visit)
+                    index = i;
+            }
+        }
+        /*for (Mat corner : corners) {
             markerCenter = Core.mean(corner);
         }*/
+        markerCenter = Core.mean(corners.get(index));
 
         // Codes commented below show how to drive the drone to move to the direction
         // such that desired tag is in the center of image frame
 
         // Calculate the image vector relative to the center of the image
-        //Scalar imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[0] - imageHeight / 2f);
+        Scalar imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[0] - imageHeight / 2f);
+
+        // if distance less than threshold then ++
+        // @todo tune distance
+        double distance = Math.sqrt((imageVector.val[1] * imageVector.val[1]) + (imageVector.val[0] * imageVector.val[0]));
+        Log.d("distance", distance + " id " + id_to_visit + " image vector " + imageVector.toString());
+        if (distance < 50) {
+            id_to_visit++;
+            for (int i = 0; i < ids.depth(); i++) {
+                if (ids.get(i, 0) != null) {
+                    if (ids.get(i, 0)[0] == id_to_visit)
+                        index = i;
+                }
+            }
+            //@todo what if we don't detect next index?
+            markerCenter = Core.mean(corners.get(index));
+            imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[0] - imageHeight / 2f);
+        }
 
         // Convert vector from image coordinate to drone navigation coordinate
-        //Scalar motionVector = convertImageVectorToMotionVector(imageVector);
+        Scalar motionVector = convertImageVectorToMotionVector(imageVector);
+        //Log.d("distance", motionVector.toString());
 
         // If there's no tag detected, no motion required
-        /*if (ids.size().empty()) {
+        if (ids.size().empty()) {
             motionVector = new Scalar(0, 0);
-        }*/
+        }
 
         // Use MoveVxVyYawrateVz(...) or MoveVxVyYawrateHeight(...)
         // depending on the mode you choose at the beginning of this function
-
-        /*Log.d("OpenCVHelper", "Moving By: " + motionVector.toString());
+        if (!ids.size().empty())
+            Log.d("OpenCVHelper", "Moving By: " + imageVector.toString());
         if ((imageVector.val[0] * imageVector.val[0] + imageVector.val[1] * imageVector.val[1]) < 900) {
             droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, -0.2f);
         } else {
             droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, 0f);
-        }*/
+        }
 
         // Sample functions to help you control the drone such as takeoff and land
         //droneHelper.takeoff();
@@ -169,7 +208,7 @@ public class OpenCVHelper {
         Imgproc.cvtColor(input, input, Imgproc.COLOR_BGR2YUV);
         extractChannel(input, input, 0);
         FlightControlData controlData =
-            new FlightControlData(0.1f, 0.0f, 0.0f, 0.0f); //pitch, roll, yaw, verticalThrottle
+                new FlightControlData(0.1f, 0.0f, 0.0f, 0.0f); //pitch, roll, yaw, verticalThrottle
         droneHelper.sendMovementCommand(controlData);
     }
 
@@ -245,7 +284,7 @@ public class OpenCVHelper {
         droneHelper.setVerticalModeToAbsoluteHeight();
 
         // Move the camera to look down so you can see the tags if needed
-        droneHelper.setGimbalPitchDegree(-75.0f);
+        droneHelper.setGimbalPitchDegree(-85.0f);
     }
 
     public void startDroneMove(DroneHelper droneHelper) {
@@ -263,22 +302,22 @@ public class OpenCVHelper {
         //Camera calibration code
         intrinsic = new Mat(3, 3, CvType.CV_32F);
         intrinsic.put(0,
-                      0,
-                      1.2702029303551683e+03,
-                      0.,
-                      7.0369652952332717e+02,
-                      0.,
-                      1.2682183239938338e+03,
-                      3.1342369745005681e+02,
-                      0.,
-                      0.,
-                      1.);
+                0,
+                1.2702029303551683e+03,
+                0.,
+                7.0369652952332717e+02,
+                0.,
+                1.2682183239938338e+03,
+                3.1342369745005681e+02,
+                0.,
+                0.,
+                1.);
 
         distortion = new MatOfDouble(3.2177759275048554e-02,
-                                     1.1688831035623757e+00,
-                                     -1.6742357543049650e-02,
-                                     1.4173384809091350e-02,
-                                     -6.1914718831876847e+00);
+                1.1688831035623757e+00,
+                -1.6742357543049650e-02,
+                1.4173384809091350e-02,
+                -6.1914718831876847e+00);
 
         // Please measure the marker size in Meter and enter it here
         double markerSizeMeters = 0.13;
