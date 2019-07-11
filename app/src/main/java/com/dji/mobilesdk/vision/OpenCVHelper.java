@@ -18,6 +18,7 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.MatOfRect;
@@ -237,14 +238,16 @@ public class OpenCVHelper {
         startDoAR(droneHelper);
         List<Mat> corners = new ArrayList<>();
         Aruco.detectMarkers(grayMat, dictionary, corners, output);
+        MatOfPoint tmp = new MatOfPoint(corners.get(corners.size() - 1));
+        MatOfPoint2f c = new MatOfPoint2f(tmp.toArray());
         if(corners.size() > 0) {
             MatOfPoint2f rvec = new MatOfPoint2f();
             MatOfPoint2f tvec = new MatOfPoint2f();
-            Calib3d.solvePnP(objPoints, (MatOfPoint2f)(corners.get(corners.size() - 1)), intrinsic,
+            Calib3d.solvePnP(objPoints, c, intrinsic,
                     distortion, rvec, tvec);
             MatOfPoint2f imagePoints = new MatOfPoint2f();
             Calib3d.projectPoints(objectPoints, rvec, tvec, intrinsic, distortion, imagePoints);
-            Mat homo = Calib3d.findHomography((MatOfPoint2f)(corners.get(corners.size() - 1)), imagePoints);
+            Mat homo = Calib3d.findHomography(c, imagePoints);
             Mat logoWarped = new Mat();
             Imgproc.warpPerspective(logoImg, logoWarped, homo, logoWarped.size());
             Imgproc.cvtColor(logoWarped, grayMat, Imgproc.COLOR_BGR2GRAY);
