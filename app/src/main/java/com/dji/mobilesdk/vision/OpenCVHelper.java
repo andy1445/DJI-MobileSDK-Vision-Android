@@ -241,35 +241,13 @@ public class OpenCVHelper {
         startDoAR(droneHelper);
         List<Mat> corners = new ArrayList<>();
         Aruco.detectMarkers(grayMat, dictionary, corners, output);
-        Mat m = corners.get(corners.size() - 1);
-        System.out.println("m itself: ");
-        System.out.println(m);
-        System.out.println("m rows: ");
-        System.out.println(m.rows());
-        System.out.println("m cols: ");
-        System.out.println(m.cols());
-        System.out.println("m dump: ");
-        System.out.println(m.dump());
-        for(int i = 0; i < m.rows(); i++){
-            for(int j = 0; j < m.cols(); j++){
-                System.out.print(i + " " + j + " " + m.get(i, j));
-            }
-        }
-        MatOfPoint2f c = new MatOfPoint2f(m);
-        System.out.println("c itself: ");
-        System.out.println(c);
-        System.out.println("c rows: ");
-        System.out.println(c.rows());
-        System.out.println("c cols: ");
-        System.out.println(c.cols());
-        System.out.println("c dump: ");
-        System.out.println(c.dump());
-        for(int i = 0; i < c.rows(); i++){
-            for(int j = 0; j < c.cols(); j++){
-                System.out.print(i + " " + j + " " + c.get(i, j));
-            }
-        }
         if (corners.size() > 0) {
+            Mat m = corners.get(corners.size() - 1);
+            Point[] parr = new Point[4];
+            for(int i = 0; i < m.cols(); i++){
+                parr[i] = new Point(m.get(0, i)[0], m.get(0, i)[1]);
+            }
+            MatOfPoint2f c = new MatOfPoint2f(parr[0], parr[1], parr[2], parr[3]);
             MatOfPoint2f rvec = new MatOfPoint2f();
             MatOfPoint2f tvec = new MatOfPoint2f();
             Calib3d.solvePnP(objPoints, c, intrinsic,
