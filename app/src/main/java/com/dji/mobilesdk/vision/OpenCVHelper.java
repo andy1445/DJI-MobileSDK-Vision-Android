@@ -139,6 +139,7 @@ public class OpenCVHelper {
         // Below snippet is an example of how you can calculate the center of the marker
         Scalar markerCenter = new Scalar(0, 0);
 
+        //Log.d("test", imageHeight + " " + imageHeight);
 
         int index = -1;
         for (int i = 0; i < ids.depth(); i++) {
@@ -148,10 +149,12 @@ public class OpenCVHelper {
                     index = i;
             }
         }
-        /*for (Mat corner : corners) {
-            markerCenter = Core.mean(corner);
-        }*/
-        markerCenter = Core.mean(corners.get(index));
+        if (index == -1) {
+            for (Mat corner : corners) {
+                markerCenter = Core.mean(corner);
+            }
+        } else
+            markerCenter = Core.mean(corners.get(index));
 
         // Codes commented below show how to drive the drone to move to the direction
         // such that desired tag is in the center of image frame
@@ -240,7 +243,7 @@ public class OpenCVHelper {
         Aruco.detectMarkers(grayMat, dictionary, corners, output);
         MatOfPoint tmp = new MatOfPoint(corners.get(corners.size() - 1));
         MatOfPoint2f c = new MatOfPoint2f(tmp.toArray());
-        if(corners.size() > 0) {
+        if (corners.size() > 0) {
             MatOfPoint2f rvec = new MatOfPoint2f();
             MatOfPoint2f tvec = new MatOfPoint2f();
             Calib3d.solvePnP(objPoints, c, intrinsic,
@@ -263,7 +266,6 @@ public class OpenCVHelper {
 
         //TODO: Do your magic!!!
         // Hint how to overlay warped logo onto the original camera image
-
 
 
         //end magic
