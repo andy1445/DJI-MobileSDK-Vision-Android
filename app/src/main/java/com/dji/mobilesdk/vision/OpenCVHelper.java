@@ -37,6 +37,7 @@ import static org.opencv.core.Core.BORDER_DEFAULT;
 import static org.opencv.core.Core.bitwise_not;
 import static org.opencv.core.Core.eigen;
 import static org.opencv.core.Core.extractChannel;
+import static org.opencv.core.Core.reduce;
 
 import java.util.Arrays;
 
@@ -50,11 +51,17 @@ public class OpenCVHelper {
     private MatOfPoint3f objectPoints;
     private int id_to_visit;
     private boolean has_taken_off;
+    private Scalar last_direction;
+    private int f1_count;
+    private int f2_count;
 
     public OpenCVHelper(Context context) {
         this.context = context;
         this.id_to_visit = 1;
         this.has_taken_off = false;
+        this.last_direction = new Scalar(0,0);
+        this.f1_count = 0;
+        this.f2_count = 0;
     }
 
     public Mat defaultImageProcessing(Mat input) {
@@ -114,6 +121,7 @@ public class OpenCVHelper {
     }
 
     public Mat detectArucoTags(Mat input, Dictionary dictionary, DroneHelper droneHelper) {
+
         Mat grayImgMat = new Mat();
         Mat intermediateImgMat = new Mat();
         Mat output = new Mat();
@@ -122,10 +130,13 @@ public class OpenCVHelper {
         Mat ids = new Mat();
         List<Mat> corners = new ArrayList<>();
         Aruco.detectMarkers(grayImgMat, dictionary, corners, ids);
+
         if (ids.depth() > 0) {
             Aruco.drawDetectedMarkers(intermediateImgMat, corners, ids, new Scalar(255, 0, 255));
-            moveOnArucoDetected(ids, corners, droneHelper, intermediateImgMat.width(), intermediateImgMat.height());
         }
+        moveOnArucoDetected(ids, corners, droneHelper, intermediateImgMat.width(), intermediateImgMat.height());
+
+
         Imgproc.cvtColor(intermediateImgMat, output, Imgproc.COLOR_RGB2BGR);
         Imgproc.cvtColor(output, output, Imgproc.COLOR_BGR2RGBA, 4);
         grayImgMat.release();
@@ -138,22 +149,24 @@ public class OpenCVHelper {
                                      DroneHelper droneHelper,
                                      int imageWidth,
                                      int imageHeight) {
+        Log.d(" id ", id_to_visit+"");
         //TODO
         // Implement your logic to decide where to move the drone
         // Below snippet is an example of how you can calculate the center of the marker
 
-        if (!has_taken_off) {
-            droneHelper.takeoff();
-            has_taken_off = true;
-        }
+        float yaw = 0.4f;
+
         if (id_to_visit == 18) {
             droneHelper.land();
             return;
         }
 
-        Scalar markerCenter = new Scalar(0, 0);
-        boolean found = true;
+        Scalar markerCenter;
 
+        if (ids.depth() == 0){
+            droneHelper.moveVxVyYawrateHeight(0f, 0f, yaw, 3.3f);
+            return;
+        }
 
         int index = -1;
         for (int i = 0; i < ids.depth(); i++) {
@@ -164,9 +177,9 @@ public class OpenCVHelper {
             }
         }
         if (index == -1) {
-            Scalar motionVector = new Scalar(0, 0);
-            droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, .2f);
-            Log.d("couldn't find id ", + id_to_visit + " image vector ");
+            //Log.d("couldn't find id ", +id_to_visit + " image vector ");
+            Scalar motionVector = convertImageVectorToMotionVector(last_direction);
+            droneHelper.moveVxVyYawrateHeight((float) motionVector.val[0], (float) motionVector.val[1], 0, 3.3f);
             return;
         } else {
             markerCenter = Core.mean(corners.get(index));
@@ -180,7 +193,7 @@ public class OpenCVHelper {
         // if distance less than threshold then ++
         // @todo tune distance
         double distance = Math.sqrt((imageVector.val[1] * imageVector.val[1]) + (imageVector.val[0] * imageVector.val[0]));
-        if (distance < 200) {
+        if (distance < 160) {
             id_to_visit++;
             index = -1;
             for (int i = 0; i < ids.depth(); i++) {
@@ -190,34 +203,32 @@ public class OpenCVHelper {
                 }
             }
             if (index == -1) {
-                Scalar motionVector = new Scalar(0, 0);
-                droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, .2f);
-                Log.d("couldn't find id ", + id_to_visit + " image vector ");
+                Scalar motionVector = convertImageVectorToMotionVector(last_direction);
+                droneHelper.moveVxVyYawrateHeight((float) motionVector.val[0], (float) motionVector.val[1], 0, 3.3f);
                 return;
-            } else
+            } else {
                 markerCenter = Core.mean(corners.get(index));
-
-            imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[1] - imageHeight / 2f);
+                imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[1] - imageHeight / 2f);
+                last_direction = imageVector;
+            }
         }
 
         // Convert vector from image coordinate to drone navigation coordinate
         Scalar motionVector = convertImageVectorToMotionVector(imageVector);
 
         // If there's no tag detected, no motion required
-        if (ids.size().empty()) {
-            motionVector = new Scalar(0, 0);
-        }
-        Log.d("distance", distance + " id " + id_to_visit + " image vector " + imageVector.toString());
-        // Use MoveVxVyYawrateVz(...) or MoveVxVyYawrateHeight(...)
+//        if (ids.size().empty()) {
+//            Scalar motionVector = convertImageVectorToMotionVector(last_direction);
+//        }
         // depending on the mode you choose at the beginning of this function
+
         if ((imageVector.val[0] * imageVector.val[0] + imageVector.val[1] * imageVector.val[1]) < 900) {
-            droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, 0f);
+            droneHelper.moveVxVyYawrateHeight((float) motionVector.val[0], (float) motionVector.val[1], 0, 3.3f);
         } else {
-            droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, 0f);
+            droneHelper.moveVxVyYawrateHeight((float) motionVector.val[0], (float) motionVector.val[1], 0, 3.3f);
         }
 
         // Sample functions to help you control the drone such as takeoff and land
-
 
     }
 
@@ -234,6 +245,7 @@ public class OpenCVHelper {
     }
 
     public Mat doAROnImage(Mat input, Dictionary dictionary, DroneHelper droneHelper) {
+        //startDoAR(droneHelper);
         //TODO:
         // Since this is the bonus part, only high-level instructions will be provided
         // One way you can do this is to:
@@ -254,13 +266,11 @@ public class OpenCVHelper {
         //    Hint: Imgproc.warpPerspective(...);
         // 7. Now you have the warped logo image in the right location, just overlay them on top of the camera image
         Mat output = new Mat();
-        Mat ids = new Mat();
         Mat grayMat = convertToGray(input);
-
         startDoAR(droneHelper);
         List<Mat> corners = new ArrayList<>();
-        Aruco.detectMarkers(grayMat, dictionary, corners, ids);
-        if (!ids.size().empty()) {
+        Aruco.detectMarkers(grayMat, dictionary, corners, output);
+        if (corners.size() > 0) {
             Mat m = corners.get(corners.size() - 1);
             Point[] parr = new Point[4];
             for (int i = 0; i < m.cols(); i++) {
@@ -269,24 +279,19 @@ public class OpenCVHelper {
             MatOfPoint2f c = new MatOfPoint2f(parr[0], parr[1], parr[2], parr[3]);
             MatOfPoint2f rvec = new MatOfPoint2f();
             MatOfPoint2f tvec = new MatOfPoint2f();
-
-            Calib3d.solvePnP(objPoints, c, intrinsic, distortion, rvec, tvec);
+            Calib3d.solvePnP(objPoints, c, intrinsic,
+                    distortion, rvec, tvec);
             MatOfPoint2f imagePoints = new MatOfPoint2f();
-
             Calib3d.projectPoints(objectPoints, rvec, tvec, intrinsic, distortion, imagePoints);
-            Point[] larr = {
-                    new Point(0, 0),
-                    new Point(0, 1770),
-                    new Point(1770, 1770),
-                    new Point(1770, 0)
-            };
-            MatOfPoint2f lm = new MatOfPoint2f(larr[0], larr[1], larr[2], larr[3]);
-            Mat homo = Calib3d.findHomography(lm, imagePoints);
+            MatOfPoint2f square = new MatOfPoint2f(new Point(0, 0), new Point(1800, 0), new Point(1800, 1800), new Point(0, 1800));
+            /*System.out.print("imagePoints: ");
+            System.out.println(imagePoints);
+            System.out.print("square: ");
+            System.out.println(square);
+           */
+            Mat homo = Calib3d.findHomography(square, imagePoints);
             Mat logoWarped = new Mat();
-            logoImg.copyTo(logoWarped);
-            Imgproc.warpPerspective(logoImg, logoWarped, homo, logoImg.size());
-
-            //given
+            Imgproc.warpPerspective(logoImg, logoWarped, homo, input.size());
             Imgproc.cvtColor(logoWarped, grayMat, Imgproc.COLOR_BGR2GRAY);
             Imgproc.threshold(grayMat, grayMat, 0, 255, Imgproc.THRESH_BINARY);
             Mat grayInv = new Mat();
@@ -295,14 +300,16 @@ public class OpenCVHelper {
             bitwise_not(grayMat, grayInv);
             input.copyTo(src1Final, grayInv);
             logoWarped.copyTo(src2Final, grayMat);
+/*            input.copyTo(src1Final);
+            logoWarped.copyTo(src2Final);
+            System.out.print("input: ");System.out.println(input.size());
+            System.out.print("logoWarped: ");System.out.println(logoWarped.size());
+            System.out.print("grayInv: ");System.out.println(grayInv.size());
+            System.out.print("src1Final: ");System.out.println(src1Final.size());
+            System.out.print("src2Final: ");System.out.println(src2Final.size());
+            */
             Core.add(src1Final, src2Final, output);
         }
-
-        //TODO: Do your magic!!!
-        // Hint how to overlay warped logo onto the original camera image
-
-
-        //end magic
 
         if (output.empty()) {
             output = grayMat;
@@ -310,6 +317,7 @@ public class OpenCVHelper {
 
         return output;
     }
+
 
     public void startDetectAruco(DroneHelper droneHelper) {
         // Virtual stick mode is a control interface
@@ -321,9 +329,10 @@ public class OpenCVHelper {
         // Use moveVxVyYawrateHeight(...)
         // Otherwise use moveVxVyYawrateVz(...)
         droneHelper.setVerticalModeToAbsoluteHeight();
+//        droneHelper.setVerticalModeToVelocity();
 
         // Move the camera to look down so you can see the tags if needed
-        droneHelper.setGimbalPitchDegree(-85.0f);
+        droneHelper.setGimbalPitchDegree(-75.0f);
     }
 
     public void startDroneMove(DroneHelper droneHelper) {
@@ -359,7 +368,7 @@ public class OpenCVHelper {
                 -6.1914718831876847e+00);
 
         // Please measure the marker size in Meter and enter it here
-        double markerSizeMeters = 0.15;
+        double markerSizeMeters = 0.13;
         double halfMarkerSize = markerSizeMeters * 0.5;
 
         // Self-defined tag location in 3D, this is used in step 2 in doAR
@@ -375,10 +384,10 @@ public class OpenCVHelper {
         objectPoints = new MatOfPoint3f();
 
         List<Point3> point3DList = new ArrayList<>();
-        /*point3DList.add(new Point3(-halfMarkerSize, -halfMarkerSize, 0));
-        point3DList.add(new Point3(-halfMarkerSize, halfMarkerSize, 0));
-        point3DList.add(new Point3(halfMarkerSize, halfMarkerSize, 0));
-        point3DList.add(new Point3(halfMarkerSize, -halfMarkerSize, 0));*/
+//        point3DList.add(new Point3(-halfMarkerSize, -halfMarkerSize, 0));
+//        point3DList.add(new Point3(-halfMarkerSize, halfMarkerSize, 0));
+//        point3DList.add(new Point3(halfMarkerSize, halfMarkerSize, 0));
+//        point3DList.add(new Point3(halfMarkerSize, -halfMarkerSize, 0));
         point3DList.add(new Point3(-halfMarkerSize, -halfMarkerSize, markerSizeMeters));
         point3DList.add(new Point3(-halfMarkerSize, halfMarkerSize, markerSizeMeters));
         point3DList.add(new Point3(halfMarkerSize, halfMarkerSize, markerSizeMeters));
@@ -394,6 +403,6 @@ public class OpenCVHelper {
         pX = pX / divisor;
         pY = pY / divisor;
 
-        return new Scalar(pX * 0.2, pY * 0.2);
+        return new Scalar(pX * 0.4, pY * 0.4);
     }
 }
