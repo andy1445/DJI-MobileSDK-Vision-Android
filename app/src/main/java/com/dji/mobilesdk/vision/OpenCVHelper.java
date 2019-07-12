@@ -3,7 +3,10 @@ package com.dji.mobilesdk.vision;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Picture;
 import android.util.Log;
+
+import com.amap.api.maps.model.Poi;
 
 import dji.common.flightcontroller.virtualstick.FlightControlData;
 
@@ -264,11 +267,20 @@ public class OpenCVHelper {
             MatOfPoint2f imagePoints = new MatOfPoint2f();
 
             Calib3d.projectPoints(objectPoints, rvec, tvec, intrinsic, distortion, imagePoints);
-            Mat homo = Calib3d.findHomography(c, imagePoints);
+
+            Point[] iparr = new Point[4];
+            for(int i=4; i<8; i++){
+                iparr[i-4] = new Point(imagePoints.get(i, 0 )[0], imagePoints.get(i, 0)[1]);
+            }
+            MatOfPoint2f ip = new MatOfPoint2f(iparr[0],iparr[1],iparr[2],iparr[3]);
+            Point[] larr = {new Point(0,0), new Point(0,1770), new Point(1770,1770), new Point(1770,1770)};
+            MatOfPoint2f lm = new MatOfPoint2f(larr[0],larr[1],larr[2],larr[3]);
+
+            Mat homo = Calib3d.findHomography(lm, ip);
             Mat logoWarped = new Mat();
-            Imgproc.warpPerspective(logoImg, logoWarped, homo, logoWarped.size());
+            Imgproc.warpPerspective(logoImg, logoWarped, homo, new Size(50, 50));
 
-
+            //given
             Imgproc.cvtColor(logoWarped, grayMat, Imgproc.COLOR_BGR2GRAY);
             Imgproc.threshold(grayMat, grayMat, 0, 255, Imgproc.THRESH_BINARY);
             Mat grayInv = new Mat();
