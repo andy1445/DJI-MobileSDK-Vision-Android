@@ -239,9 +239,10 @@ public class OpenCVHelper {
         Mat output = new Mat();
         Mat grayMat = convertToGray(input);
         startDoAR(droneHelper);
+        Mat ids = new Mat();
         List<Mat> corners = new ArrayList<>();
-        Aruco.detectMarkers(grayMat, dictionary, corners, output);
-        if (corners.size() > 0) {
+        Aruco.detectMarkers(grayMat, dictionary, corners, ids);
+        if (!ids.size().empty()) {
             Mat m = corners.get(corners.size() - 1);
             Point[] parr = new Point[4];
             for(int i = 0; i < m.cols(); i++){
@@ -254,7 +255,19 @@ public class OpenCVHelper {
                     distortion, rvec, tvec);
             MatOfPoint2f imagePoints = new MatOfPoint2f();
             Calib3d.projectPoints(objectPoints, rvec, tvec, intrinsic, distortion, imagePoints);
-            Mat homo = Calib3d.findHomography(c, imagePoints);
+            Point[] iparr = new Point[4];
+            for(int i = 4; i < 8; i++){
+                iparr[i-4] = new Point(imagePoints.get(0, i)[0], imagePoints.get(0, i)[1]);
+            }
+            MatOfPoint2f ip = new MatOfPoint2f(iparr[0], iparr[1], iparr[2], iparr[3]);
+            Point[] larr = {
+                    new Point(0, 0),
+                    new Point(0, 1770),
+                    new Point(1770, 1770),
+                    new Point(1770, 0)
+            };
+            MatOfPoint2f lm = new MatOfPoint2f(larr[0], larr[1], larr[2], larr[3]);
+            Mat homo = Calib3d.findHomography(c, ip);
             Mat logoWarped = new Mat();
             Imgproc.warpPerspective(logoImg, logoWarped, homo, logoWarped.size());
             Imgproc.cvtColor(logoWarped, grayMat, Imgproc.COLOR_BGR2GRAY);
