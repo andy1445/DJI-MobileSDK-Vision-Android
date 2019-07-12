@@ -186,13 +186,11 @@ public class OpenCVHelper {
             } else
                 markerCenter = Core.mean(corners.get(index));
 
-            //@todo what if we don't detect next index?
             imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[1] - imageHeight / 2f);
         }
 
         // Convert vector from image coordinate to drone navigation coordinate
         Scalar motionVector = convertImageVectorToMotionVector(imageVector);
-        //Log.d("distance", motionVector.toString());
 
         // If there's no tag detected, no motion required
         if (ids.size().empty()) {
@@ -201,8 +199,6 @@ public class OpenCVHelper {
         Log.d("distance", distance + " id " + id_to_visit + " image vector " + imageVector.toString());
         // Use MoveVxVyYawrateVz(...) or MoveVxVyYawrateHeight(...)
         // depending on the mode you choose at the beginning of this function
-        //if (!ids.size().empty())
-        //    Log.d("OpenCVHelper", "Moving By: " + imageVector.toString());
         if ((imageVector.val[0] * imageVector.val[0] + imageVector.val[1] * imageVector.val[1]) < 900) {
             droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, -0.2f);
         } else {
@@ -249,11 +245,12 @@ public class OpenCVHelper {
         // 7. Now you have the warped logo image in the right location, just overlay them on top of the camera image
         Mat output = new Mat();
         Mat grayMat = convertToGray(input);
+
         startDoAR(droneHelper);
         List<Mat> corners = new ArrayList<>();
         Aruco.detectMarkers(grayMat, dictionary, corners, output);
 
-        if (corners.size() > 0) {
+        if (!output.empty()) {
             Mat m = corners.get(corners.size() - 1);
             Point[] parr = new Point[4];
             for (int i = 0; i < m.cols(); i++) {
@@ -353,7 +350,7 @@ public class OpenCVHelper {
                 -6.1914718831876847e+00);
 
         // Please measure the marker size in Meter and enter it here
-        double markerSizeMeters = 0.13;
+        double markerSizeMeters = 0.15;
         double halfMarkerSize = markerSizeMeters * 0.5;
 
         // Self-defined tag location in 3D, this is used in step 2 in doAR
