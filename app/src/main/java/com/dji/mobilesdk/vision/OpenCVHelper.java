@@ -241,8 +241,16 @@ public class OpenCVHelper {
         startDoAR(droneHelper);
         List<Mat> corners = new ArrayList<>();
         Aruco.detectMarkers(grayMat, dictionary, corners, output);
-        MatOfPoint tmp = new MatOfPoint(corners.get(corners.size() - 1));
-        MatOfPoint2f c = new MatOfPoint2f(tmp.toArray());
+        Mat m = corners.get(corners.size() - 1);
+        System.out.println("m itself: ");
+        System.out.println(m);
+        System.out.println("m rows: ");
+        System.out.println(m.rows());
+        System.out.println("m cols: ");
+        System.out.println(m.cols());
+        System.out.println("m dump: ");
+        System.out.println(m.dump());
+        MatOfPoint2f c = new MatOfPoint2f(m)
         if (corners.size() > 0) {
             MatOfPoint2f rvec = new MatOfPoint2f();
             MatOfPoint2f tvec = new MatOfPoint2f();
