@@ -49,11 +49,12 @@ public class OpenCVHelper {
     private Mat logoImg;
     private MatOfPoint3f objectPoints;
     private int id_to_visit;
-    private boolean has_visited_last_id;
+    private boolean has_taken_off;
 
     public OpenCVHelper(Context context) {
         this.context = context;
-        this.id_to_visit = 0;
+        this.id_to_visit = 1;
+        this.has_taken_off = false;
     }
 
     public Mat defaultImageProcessing(Mat input) {
@@ -140,6 +141,16 @@ public class OpenCVHelper {
         //TODO
         // Implement your logic to decide where to move the drone
         // Below snippet is an example of how you can calculate the center of the marker
+
+        if (!has_taken_off) {
+            droneHelper.takeoff();
+            has_taken_off = true;
+        }
+        if (id_to_visit == 18) {
+            droneHelper.land();
+            return;
+        }
+
         Scalar markerCenter = new Scalar(0, 0);
         boolean found = true;
 
@@ -153,11 +164,10 @@ public class OpenCVHelper {
             }
         }
         if (index == -1) {
-            found = false;
-            // @todo add lift up/tune camera
-            for (Mat corner : corners) {
-                markerCenter = Core.mean(corner);
-            }
+            Scalar motionVector = new Scalar(0, 0);
+            droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, .2f);
+            Log.d("couldn't find id ", + id_to_visit + " image vector ");
+            return;
         } else {
             markerCenter = Core.mean(corners.get(index));
         }
@@ -170,8 +180,9 @@ public class OpenCVHelper {
         // if distance less than threshold then ++
         // @todo tune distance
         double distance = Math.sqrt((imageVector.val[1] * imageVector.val[1]) + (imageVector.val[0] * imageVector.val[0]));
-        if (distance < 150 && found) {
+        if (distance < 200) {
             id_to_visit++;
+            index = -1;
             for (int i = 0; i < ids.depth(); i++) {
                 if (ids.get(i, 0) != null) {
                     if (ids.get(i, 0)[0] == id_to_visit)
@@ -179,10 +190,10 @@ public class OpenCVHelper {
                 }
             }
             if (index == -1) {
-                // @todo add lift up/tune camera
-                for (Mat corner : corners) {
-                    markerCenter = Core.mean(corner);
-                }
+                Scalar motionVector = new Scalar(0, 0);
+                droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, .2f);
+                Log.d("couldn't find id ", + id_to_visit + " image vector ");
+                return;
             } else
                 markerCenter = Core.mean(corners.get(index));
 
@@ -200,14 +211,13 @@ public class OpenCVHelper {
         // Use MoveVxVyYawrateVz(...) or MoveVxVyYawrateHeight(...)
         // depending on the mode you choose at the beginning of this function
         if ((imageVector.val[0] * imageVector.val[0] + imageVector.val[1] * imageVector.val[1]) < 900) {
-            droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, -0.2f);
+            droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, 0f);
         } else {
             droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, 0f);
         }
 
         // Sample functions to help you control the drone such as takeoff and land
-        //droneHelper.takeoff();
-        //droneHelper.land();
+
 
     }
 
@@ -244,10 +254,10 @@ public class OpenCVHelper {
         //    Hint: Imgproc.warpPerspective(...);
         // 7. Now you have the warped logo image in the right location, just overlay them on top of the camera image
         Mat output = new Mat();
+        Mat ids = new Mat();
         Mat grayMat = convertToGray(input);
 
         startDoAR(droneHelper);
-        Mat ids = new Mat();
         List<Mat> corners = new ArrayList<>();
         Aruco.detectMarkers(grayMat, dictionary, corners, ids);
         if (!ids.size().empty()) {
