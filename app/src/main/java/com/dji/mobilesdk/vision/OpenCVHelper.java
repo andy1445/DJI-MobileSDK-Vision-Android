@@ -139,7 +139,6 @@ public class OpenCVHelper {
         // Below snippet is an example of how you can calculate the center of the marker
         Scalar markerCenter = new Scalar(0, 0);
 
-        //Log.d("test", imageHeight + " " + imageHeight);
 
         int index = -1;
         for (int i = 0; i < ids.depth(); i++) {
@@ -158,6 +157,7 @@ public class OpenCVHelper {
 
         // Codes commented below show how to drive the drone to move to the direction
         // such that desired tag is in the center of image frame
+        Log.d("center", markerCenter.val[0] + " " + markerCenter.val[1]);
 
         // Calculate the image vector relative to the center of the image
         Scalar imageVector = new Scalar(markerCenter.val[0] - imageWidth / 2f, markerCenter.val[0] - imageHeight / 2f);
@@ -165,7 +165,7 @@ public class OpenCVHelper {
         // if distance less than threshold then ++
         // @todo tune distance
         double distance = Math.sqrt((imageVector.val[1] * imageVector.val[1]) + (imageVector.val[0] * imageVector.val[0]));
-        Log.d("distance", distance + " id " + id_to_visit + " image vector " + imageVector.toString());
+        //Log.d("distance", distance + " id " + id_to_visit + " image vector " + imageVector.toString());
         if (distance < 50) {
             id_to_visit++;
             for (int i = 0; i < ids.depth(); i++) {
@@ -190,8 +190,8 @@ public class OpenCVHelper {
 
         // Use MoveVxVyYawrateVz(...) or MoveVxVyYawrateHeight(...)
         // depending on the mode you choose at the beginning of this function
-        if (!ids.size().empty())
-            Log.d("OpenCVHelper", "Moving By: " + imageVector.toString());
+        //if (!ids.size().empty())
+        //    Log.d("OpenCVHelper", "Moving By: " + imageVector.toString());
         if ((imageVector.val[0] * imageVector.val[0] + imageVector.val[1] * imageVector.val[1]) < 900) {
             droneHelper.moveVxVyYawrateVz((float) motionVector.val[0], (float) motionVector.val[1], 0f, -0.2f);
         } else {
